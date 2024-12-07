@@ -64,7 +64,7 @@ El sistema está diseñado con los siguientes componentes:
 1. Clona este repositorio:
 
    ```bash
-   git clone https://github.com/Nob0dyknows99/ubishop-app.git
+   git clone https://github.com/Nob0dyknows99/UbishopApp.git
 
 2. Instala las dependencias del frontend y backend:
 
