@@ -4,15 +4,82 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ubishop App - README</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        header {
+            background: #0073e6;
+            color: #fff;
+            padding: 20px 10px;
+            text-align: center;
+        }
+        nav ul {
+            background: #333;
+            color: #fff;
+            padding: 10px;
+            list-style: none;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+        nav ul li {
+            margin: 5px 0;
+        }
+        nav ul a {
+            color: #fff;
+            text-decoration: none;
+            padding: 5px 10px;
+            transition: background 0.3s;
+        }
+        nav ul a:hover {
+            background: #0073e6;
+            border-radius: 5px;
+        }
+        section {
+            padding: 20px;
+            background: #fff;
+            margin: 20px auto;
+            max-width: 800px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #0073e6;
+        }
+        ul, ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        pre {
+            background: #f4f4f4;
+            border-left: 5px solid #0073e6;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        code {
+            color: #0073e6;
+        }
+        footer {
+            text-align: center;
+            padding: 10px;
+            margin-top: 20px;
+            background: #333;
+            color: #fff;
+        }
+    </style>
 </head>
 <body>
     <header>
         <h1>Ubishop App</h1>
-        <p>Una solución innovadora para mejorar la experiencia de compra, conectando consumidores con comercios locales mediante funcionalidades avanzadas como geolocalización, cotización instantánea y más.</p>
+        <p>Una solución innovadora para mejorar la experiencia de compra, conectando consumidores con comercios locales.</p>
     </header>
 
     <nav>
-        <h2>Tabla de Contenidos</h2>
         <ul>
             <li><a href="#descripcion">Descripción del Proyecto</a></li>
             <li><a href="#caracteristicas">Características Principales</a></li>
@@ -97,40 +164,8 @@ npm run dev</code></pre>
         </ol>
     </section>
 
-    <section id="uso">
-        <h2>Uso</h2>
-        <ol>
-            <li>Registra un usuario desde la aplicación.</li>
-            <li>Permite el acceso a tu ubicación para visualizar comercios cercanos.</li>
-            <li>Busca productos o servicios y compara precios en tiempo real.</li>
-            <li>Califica y deja opiniones para mejorar la comunidad de usuarios.</li>
-        </ol>
-    </section>
-
-    <section id="colaboracion">
-        <h2>Colaboración</h2>
-        <p>Estamos abiertos a contribuciones. Por favor, sigue estos pasos:</p>
-        <ol>
-            <li>Haz un fork del repositorio.</li>
-            <li>Crea una rama para tu funcionalidad (<code>git checkout -b feature/nueva-funcion</code>).</li>
-            <li>Envía un pull request.</li>
-        </ol>
-    </section>
-
-    <section id="autores">
-        <h2>Autores</h2>
-        <ul>
-            <li><strong>Vicente Campillay:</strong> Tester</li>
-            <li><strong>Benjamin Gonzalez:</strong> Backend Developer</li>
-            <li><strong>Marcelo Cancino:</strong> Scrum Master</li>
-            <li><strong>Claudio Acevedo:</strong> Frontend Developer</li>
-            <li><strong>Luis Arévalo:</strong> UI/UX Designer</li>
-        </ul>
-    </section>
-
-    <section id="licencia">
-        <h2>Licencia</h2>
-        <p>Este proyecto está licenciado bajo los términos de la <a href="LICENSE">MIT License</a>.</p>
-    </section>
+    <footer>
+        <p>© 2024 Ubishop App. Todos los derechos reservados.</p>
+    </footer>
 </body>
 </html>
