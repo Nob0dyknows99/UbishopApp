@@ -35,7 +35,7 @@ Desarrollar una plataforma que permita la cotización de productos y servicios c
 ## Requerimientos del Sistema
 
 - **Plataforma:** Android 8.0 o superior
-- **Tecnologías:** React Native, Node.js con Express, MySQL
+- **Tecnologías:** React Native, Node.js con Express, MongoDB, Mongoose
 - **Dependencias:**
   - API de mapas para geolocalización
   - API de comparación de precios
@@ -49,7 +49,7 @@ El sistema está diseñado con los siguientes componentes:
 
 - **Frontend:** React Native
 - **Backend:** Node.js con Express
-- **Base de Datos:** MySQL Workbench
+- **Base de Datos:** MongoDBCompass
 
 **Flujo de Trabajo:**
 
