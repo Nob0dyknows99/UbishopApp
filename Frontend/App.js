@@ -25,7 +25,6 @@ import { View, StyleSheet } from 'react-native';
 
 const Stack = createStackNavigator();
 
-// Componente para envolver las pantallas en un diseño común
 const AppLayout = ({ children }) => (
   <View style={styles.container}>
     <Header />
@@ -39,7 +38,6 @@ const AppNavigator = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {/* Pantallas para usuarios no autenticados */}
       {!isLoggedIn ? (
         <>
           <Stack.Screen name="Home">
@@ -50,9 +48,9 @@ const AppNavigator = () => {
             )}
           </Stack.Screen>
           <Stack.Screen name="Productos">
-            {({ navigation }) => (
+            {({ navigation, route }) => ( // Asegurar que route se pase correctamente
               <AppLayout>
-                <Productos navigation={navigation} />
+                <Productos navigation={navigation} route={route} />
               </AppLayout>
             )}
           </Stack.Screen>
@@ -93,7 +91,6 @@ const AppNavigator = () => {
           </Stack.Screen>
         </>
       ) : role === 'Cliente' ? (
-        // Pantallas para el rol "Cliente"
         <>
           <Stack.Screen name="Home">
             {({ navigation }) => (
@@ -103,9 +100,9 @@ const AppNavigator = () => {
             )}
           </Stack.Screen>
           <Stack.Screen name="Productos">
-            {({ navigation }) => (
+            {({ navigation, route }) => (
               <AppLayout>
-                <Productos navigation={navigation} />
+                <Productos navigation={navigation} route={route} />
               </AppLayout>
             )}
           </Stack.Screen>
@@ -125,7 +122,6 @@ const AppNavigator = () => {
           </Stack.Screen>
         </>
       ) : (
-        // Pantallas para el rol "Tienda"
         <>
           <Stack.Screen name="HomeTienda">
             {({ navigation }) => (
@@ -135,9 +131,9 @@ const AppNavigator = () => {
             )}
           </Stack.Screen>
           <Stack.Screen name="Productos">
-            {({ navigation }) => (
+            {({ navigation, route }) => (
               <AppLayout>
-                <Productos navigation={navigation} />
+                <Productos navigation={navigation} route={route} />
               </AppLayout>
             )}
           </Stack.Screen>

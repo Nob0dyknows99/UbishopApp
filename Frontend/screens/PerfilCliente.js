@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useAuth } from '../components/AuthContext';
 
 const PerfilCliente = () => {
-  const { role, logout, userInfo } = useAuth();
+  const { role, logout, userInfo, userId } = useAuth();
 
   if (role !== 'Cliente') {
     return (
@@ -21,29 +21,54 @@ const PerfilCliente = () => {
     email: '',
   });
 
-  const [backupData, setBackupData] = useState({});
-
   useEffect(() => {
-    console.log('userInfo recibido:', userInfo); // LOG DE DEPURACIÓN
+    console.log('userInfo:', userInfo); // Verifica si los datos llegan correctamente
     setFormData({
       name: userInfo.nombre_usuario || '',
-      phone: userInfo.telefono || '', // Asegúrate de que `telefono` esté disponible
+      phone: userInfo.telefono || '',
       email: userInfo.email || '',
     });
   }, [userInfo]);
 
   const handleEdit = (field) => {
     setEditableField(field);
-    setBackupData({ ...formData });
   };
 
-  const handleSave = () => {
-    console.log('Datos guardados:', formData);
-    setEditableField(null);
+  const handleSave = async () => {
+    const payload = {
+      nombre_usuario: formData.name,
+      telefono: formData.phone,
+    };
+
+    try {
+      const response = await fetch(`http://192.168.0.106:3000/usuarios/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        Alert.alert('Éxito', 'Datos actualizados correctamente');
+        setEditableField(null);
+      } else {
+        const errorText = await response.text();
+        console.error('Error en la respuesta:', errorText);
+        Alert.alert('Error', `No se pudieron actualizar los datos: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error en la solicitud:', error);
+      Alert.alert('Error', 'Hubo un problema con la solicitud. Verifica la consola.');
+    }
   };
 
   const handleCancel = () => {
-    setFormData({ ...backupData });
+    setFormData({
+      name: userInfo.nombre_usuario,
+      phone: userInfo.telefono,
+      email: userInfo.email,
+    });
     setEditableField(null);
   };
 
@@ -67,8 +92,8 @@ const PerfilCliente = () => {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Teléfono"
-            value={formData.phone}
+            placeholder="Teléfono" // Placeholder por defecto
+            value={formData.phone} // Muestra el teléfono del usuario
             editable={editableField === 'phone'}
             onChangeText={(text) => setFormData({ ...formData, phone: text })}
           />
@@ -82,7 +107,7 @@ const PerfilCliente = () => {
             style={styles.input}
             placeholder="Email"
             value={formData.email}
-            editable={false}
+            editable={false} // No editable
           />
         </View>
 
@@ -104,6 +129,7 @@ const PerfilCliente = () => {
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

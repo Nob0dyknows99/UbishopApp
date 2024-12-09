@@ -43,12 +43,12 @@ const PerfilTienda = () => {
       }
 
       try {
-        const response = await axios.get(`http://192.168.0.104:3000/tienda/${userId}`);
+        const response = await axios.get(`http://192.168.0.106:3000/tienda/${userId}`);
         const data = response.data;
 
         // Obtener la ubicación de la tienda
         const locationResponse = await axios.get(
-          `http://192.168.0.104:3000/ubicacion?tienda_id=${data.tienda_id}`
+          `http://192.168.0.106:3000/ubicacion?tienda_id=${data.tienda_id}`
         );
 
         const locationData = locationResponse.data[0] || {};
@@ -81,7 +81,7 @@ const PerfilTienda = () => {
     }
 
     try {
-      await axios.put(`http://192.168.0.104:3000/tienda/${userId}`, formData);
+      await axios.put(`http://192.168.0.106:3000/tienda/${userId}`, formData);
       console.log("Datos guardados:", formData);
     } catch (error) {
       console.error("Error al guardar los datos de la tienda:", error);
@@ -106,10 +106,10 @@ const PerfilTienda = () => {
 
       if (locationId) {
         // Actualizar ubicación existente
-        await axios.put(`http://192.168.0.104:3000/ubicacion/${locationId}`, updatedLocation);
+        await axios.put(`http://192.168.0.106:3000/ubicacion/${locationId}`, updatedLocation);
       } else {
         // Crear nueva ubicación si no existe
-        const response = await axios.post(`http://192.168.0.104:3000/ubicacion`, updatedLocation);
+        const response = await axios.post(`http://192.168.0.106:3000/ubicacion`, updatedLocation);
         setLocationId(response.data._id); // Guardar el nuevo ID de la ubicación
       }
 

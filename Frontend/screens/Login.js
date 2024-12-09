@@ -17,7 +17,7 @@ const Login = ({ navigation }) => {
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedPassword = password.trim();
   
-      const response = await fetch('http://192.168.0.104:3000/login', {
+      const response = await fetch('http://192.168.0.106:3000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, clave: normalizedPassword }),
@@ -50,6 +50,7 @@ const Login = ({ navigation }) => {
         <Text style={styles.formTitle}>Iniciar sesión</Text>
         <TextInput
           style={styles.input}
+          keyboardType="email-address"
           placeholder="Email"
           placeholderTextColor="#B0B0B0"
           value={email}

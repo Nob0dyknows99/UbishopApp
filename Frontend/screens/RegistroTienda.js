@@ -1,103 +1,180 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 
 const RegistroTienda = ({ navigation }) => {
   const [storeName, setStoreName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [email, setEmail] = useState('');
-  const [telefono, settelefono] = useState ('');
+  const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
+  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({
+    storeName: false,
+    ownerName: false,
+    email: false,
+    telefono: false,
+    password: false,
+    repeatPassword: false,
+  });
 
   const handleRegister = async () => {
+    setError('');
+    setFieldErrors({
+      storeName: false,
+      ownerName: false,
+      email: false,
+      telefono: false,
+      password: false,
+      repeatPassword: false,
+    });
+
+    const newFieldErrors = { ...fieldErrors };
+    if (!storeName) newFieldErrors.storeName = true;
+    if (!ownerName) newFieldErrors.ownerName = true;
+    if (!email) newFieldErrors.email = true;
+    if (!telefono) newFieldErrors.telefono = true;
+    if (!password) newFieldErrors.password = true;
+    if (!repeatPassword) newFieldErrors.repeatPassword = true;
+
+    if (Object.values(newFieldErrors).some((error) => error)) {
+      setError('Todos los campos son obligatorios');
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
     if (password !== repeatPassword) {
-      console.log('Las contraseñas no coinciden');
+      setError('Las contraseñas no coinciden');
+      setFieldErrors({ ...newFieldErrors, password: true, repeatPassword: true });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('El formato del email es incorrecto');
+      setFieldErrors({ ...newFieldErrors, email: true });
       return;
     }
 
     try {
-      const response = await fetch('http://192.168.0.104:3000/register', {
+      const response = await fetch('http://192.168.0.106:3000/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre_usuario: ownerName.trim(),
+          nombre_tienda: storeName.trim(),
           email: email.trim().toLowerCase(),
           clave: password.trim(),
           telefono: telefono.trim(),
-          rol_id: 2, // Rol de Tienda
+          rol_id: 2,
         }),
       });
 
       const data = await response.json();
+
       if (response.ok) {
         console.log(data.mensaje);
         navigation.navigate('Login');
       } else {
-        console.error(data.error);
+        if (data.error === 'Email ya registrado') {
+          setError('El email ya está registrado');
+          setFieldErrors({ ...newFieldErrors, email: true });
+        } else {
+          setError(data.error || 'Error al registrarse');
+        }
       }
     } catch (error) {
-      console.error('Error de red:', error);
+      setError('Error de red. Inténtalo nuevamente más tarde.');
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Registro de Tienda</Text>
-      <View style={styles.formContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre del Propietario"
-          placeholderTextColor="#B0B0B0"
-          value={ownerName}
-          onChangeText={setOwnerName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de la Tienda"
-          placeholderTextColor="#B0B0B0"
-          value={storeName}
-          onChangeText={setStoreName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Correo Electrónico"
-          placeholderTextColor="#B0B0B0"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-        />
-         <TextInput
-          style={styles.input}
-          placeholder="Telefono"
-          placeholderTextColor="#B0B0B0"
-          value={telefono}
-          onChangeText={settelefono}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#B0B0B0"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Repite Contraseña"
-          placeholderTextColor="#B0B0B0"
-          value={repeatPassword}
-          onChangeText={setRepeatPassword}
-          secureTextEntry
-        />
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Registrarse</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Registro de Tienda</Text>
+          <View style={styles.formContainer}>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <TextInput
+              style={[styles.input, fieldErrors.ownerName ? styles.inputError : null]}
+              placeholder="Nombre del Propietario"
+              placeholderTextColor="#B0B0B0"
+              value={ownerName}
+              onChangeText={(value) => {
+                setOwnerName(value);
+                setFieldErrors((prev) => ({ ...prev, ownerName: false }));
+              }}
+            />
+            <TextInput
+              style={[styles.input, fieldErrors.storeName ? styles.inputError : null]}
+              placeholder="Nombre de la Tienda"
+              placeholderTextColor="#B0B0B0"
+              value={storeName}
+              onChangeText={(value) => {
+                setStoreName(value);
+                setFieldErrors((prev) => ({ ...prev, storeName: false }));
+              }}
+            />
+            <TextInput
+              style={[styles.input, fieldErrors.email ? styles.inputError : null]}
+              placeholder="Correo Electrónico"
+              placeholderTextColor="#B0B0B0"
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                setFieldErrors((prev) => ({ ...prev, email: false }));
+              }}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={[styles.input, fieldErrors.telefono ? styles.inputError : null]}
+              placeholder="Teléfono"
+              placeholderTextColor="#B0B0B0"
+              value={telefono}
+              onChangeText={(value) => {
+                setTelefono(value);
+                setFieldErrors((prev) => ({ ...prev, telefono: false }));
+              }}
+            />
+            <TextInput
+              style={[styles.input, fieldErrors.password ? styles.inputError : null]}
+              placeholder="Contraseña"
+              placeholderTextColor="#B0B0B0"
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                setFieldErrors((prev) => ({ ...prev, password: false }));
+              }}
+              secureTextEntry
+            />
+            <TextInput
+              style={[styles.input, fieldErrors.repeatPassword ? styles.inputError : null]}
+              placeholder="Repite Contraseña"
+              placeholderTextColor="#B0B0B0"
+              value={repeatPassword}
+              onChangeText={(value) => {
+                setRepeatPassword(value);
+                setFieldErrors((prev) => ({ ...prev, repeatPassword: false }));
+              }}
+              secureTextEntry
+            />
+            <TouchableOpacity style={styles.button} onPress={handleRegister}>
+              <Text style={styles.buttonText}>Registrarse</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -127,6 +204,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: '#FFFFFF',
   },
+  inputError: {
+    borderColor: 'red',
+  },
   button: {
     width: '100%',
     height: 40,
@@ -139,6 +219,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });
 

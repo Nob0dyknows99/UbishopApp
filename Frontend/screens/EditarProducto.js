@@ -29,7 +29,7 @@ const EditarProducto = ({ navigation }) => {
       if (!userId) return;
 
       try {
-        const response = await axios.get(`http://192.168.0.104:3000/productos`);
+        const response = await axios.get(`http://192.168.0.106:3000/productos`);
         const userProducts = response.data.filter(
           (product) => product.tienda_id === userId
         );
@@ -122,7 +122,7 @@ const EditarProducto = ({ navigation }) => {
 
     try {
       await axios.put(
-        `http://192.168.0.104:3000/productos/${selectedProduct.producto_id}`,
+        `http://192.168.0.106:3000/productos/${selectedProduct.producto_id}`,
         updatedProduct
       );
 

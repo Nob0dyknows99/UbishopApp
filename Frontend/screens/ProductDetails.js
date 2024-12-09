@@ -38,7 +38,7 @@ const ProductDetails = ({ route, navigation }) => {
         return;
       }
       try {
-        const response = await axios.get(`http://192.168.0.104:3000/opiniones/producto/${product.producto_id}`);
+        const response = await axios.get(`http://192.168.0.106:3000/opiniones/producto/${product.producto_id}`);
         setReviews(response.data);
       } catch (error) {
         console.error('Error al obtener opiniones:', error);
@@ -62,13 +62,13 @@ const ProductDetails = ({ route, navigation }) => {
     const fetchStoreDetails = async () => {
       if (product?.tienda_id) {
         try {
-          const locationResponse = await axios.get(`http://192.168.0.104:3000/ubicacion/${product.tienda_id}`);
+          const locationResponse = await axios.get(`http://192.168.0.106:3000/ubicacion/${product.tienda_id}`);
           setStoreLocation(locationResponse.data);
         } catch (error) {
           console.error('Error al obtener la ubicación de la tienda:', error);
         }
         try {
-          const storeResponse = await axios.get(`http://192.168.0.104:3000/tienda/${product.tienda_id}`);
+          const storeResponse = await axios.get(`http://192.168.0.106:3000/tienda/${product.tienda_id}`);
           setStoreName(storeResponse.data.nombre || 'Tienda no disponible');
         } catch (error) {
           console.error('Error al obtener el nombre de la tienda:', error);
@@ -116,7 +116,7 @@ const ProductDetails = ({ route, navigation }) => {
         comentario: newReview.trim(),
       };
 
-      await axios.post('http://192.168.0.104:3000/opiniones', newOpinion);
+      await axios.post('http://192.168.0.106:3000/opiniones', newOpinion);
       setReviews([...reviews, { ...newOpinion, usuario: userInfo.nombre_usuario }]);
       setNewReview('');
       setNewRating('');

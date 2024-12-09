@@ -20,7 +20,7 @@ const SuscripcionTienda = ({ navigation }) => {
 
     const fetchSubscriptionData = async () => {
       try {
-        const response = await fetch(`http://192.168.0.104:3000/tienda/plan/${userId}`);
+        const response = await fetch(`http://192.168.0.106:3000/tienda/plan/${userId}`);
         if (!response.ok) {
           throw new Error('Error en la respuesta del servidor');
         }

@@ -14,23 +14,8 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { FontAwesome } from 'react-native-vector-icons';
-import * as Location from 'expo-location';
-import { useAuth } from '../components/AuthContext'; // Importar AuthContext
+import { useAuth } from '../components/AuthContext';
 
-// Función para calcular la distancia entre dos coordenadas (fórmula de Haversine)
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const toRad = (value) => (value * Math.PI) / 180;
-  const R = 6371; // Radio de la Tierra en kilómetros
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distancia en kilómetros
-};
-
-// Componente para mostrar cada tarjeta de producto
 const ProductCard = ({ product, navigation }) => {
   const [imageUrl, setImageUrl] = useState('');
   const [loadingImage, setLoadingImage] = useState(true);
@@ -80,122 +65,56 @@ const ProductCard = ({ product, navigation }) => {
   );
 };
 
-// Componente principal para la pantalla de productos
-const Productos = ({ navigation }) => {
-  const { role, userId } = useAuth(); // Obtener rol y userId del contexto
+const Productos = ({ navigation, route }) => {
+  const { role, userId } = useAuth();
+  const initialSearchText = route?.params?.searchText || '';
   const [products, setProducts] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [tiendas, setTiendas] = useState([]); // Tiendas con plan_id
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('Todos'); // Filtro de categoría
-  const [categories, setCategories] = useState([]); // Categorías
-  const [isModalVisible, setModalVisible] = useState(false); // Modal para seleccionar categorías
-  const [userLocation, setUserLocation] = useState(null); // Ubicación del usuario
-  const [priceOrder, setPriceOrder] = useState(null); // Filtro de orden de precio
-  const fixedRadius = 500; // Radio fijo de 5 kilómetros
+  const [searchText, setSearchText] = useState(initialSearchText);
+  const [categoryFilter, setCategoryFilter] = useState('Todos');
+  const [priceOrder, setPriceOrder] = useState(null);
+  const [isModalVisible, setModalVisible] = useState(false);
 
-  const fetchProducts = async () => {
+  // Fetch products and categories from the backend
+  const fetchProductsAndCategories = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://192.168.0.104:3000/productos');
-      setProducts(response.data);
+      const [productResponse, categoryResponse] = await Promise.all([
+        axios.get('http://192.168.0.106:3000/productos'),
+        axios.get('http://192.168.0.106:3000/categorias'),
+      ]);
+
+      setProducts(productResponse.data);
+      setCategories([{ nombre_categoria: 'Todos', categoria_id: null }, ...categoryResponse.data]);
     } catch (error) {
-      console.error('Error al cargar productos:', error);
+      console.error('Error al cargar productos o categorías:', error);
+      Alert.alert('Error', 'Hubo un problema al cargar los datos.');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchLocations = async () => {
-    try {
-      const response = await axios.get('http://192.168.0.104:3000/ubicacion');
-      setLocations(response.data);
-    } catch (error) {
-      console.error('Error al cargar ubicaciones:', error);
-    }
-  };
-
-  const fetchTiendas = async () => {
-    try {
-      const response = await axios.get('http://192.168.0.104:3000/tiendas');
-      setTiendas(response.data.filter((tienda) => tienda.plan_id !== 0)); // Filtrar tiendas con plan_id !== 0
-    } catch (error) {
-      console.error('Error al cargar tiendas:', error);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get('http://192.168.0.104:3000/categorias');
-      setCategories([{ nombre_categoria: 'Todos', categoria_id: null }, ...response.data]);
-    } catch (error) {
-      console.error('Error al cargar categorías:', error);
-    }
-  };
-
-  const fetchLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permisos necesarios',
-          'Se necesitan permisos de ubicación para filtrar productos cercanos.'
-        );
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-      console.log('Ubicación del usuario:', location.coords);
-    } catch (error) {
-      console.error('Error al obtener la ubicación:', error);
-    }
-  };
-
   useEffect(() => {
-    fetchProducts();
-    fetchLocations();
-    fetchTiendas(); // Cargar tiendas con plan válido
-    fetchCategories();
-    if (role !== 'Tienda') fetchLocation(); // Solo obtener ubicación si no es "Tienda"
-  }, [role]);
+    fetchProductsAndCategories();
+  }, []);
 
+  // Filter products
   const filteredProducts = products
     .filter((product) => {
-      const tienda = tiendas.find((t) => t.tienda_id === product.tienda_id);
-      if (!tienda) return false;
-
       if (role === 'Tienda') {
         return product.tienda_id === userId;
       }
 
-      if (role === 'Todos' && userLocation) {
-        const location = locations.find((loc) => loc.tienda_id === product.tienda_id);
-        if (!location || !location.latitud || !location.longitud) {
-          return false;
-        }
-
-        const distance = calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          location.latitud,
-          location.longitud
+      if (categoryFilter !== 'Todos') {
+        return (
+          product.categoria_id ===
+          categories.find((cat) => cat.nombre_categoria === categoryFilter)?.categoria_id
         );
-
-        return distance <= fixedRadius;
       }
 
       return true;
     })
-    .filter((product) =>
-      categoryFilter === 'Todos'
-        ? true
-        : product.categoria_id === categories.find((cat) => cat.nombre_categoria === categoryFilter)?.categoria_id
-    )
     .filter((product) =>
       searchText
         ? product.nombre_producto.toLowerCase().includes(searchText.toLowerCase())
@@ -213,6 +132,7 @@ const Productos = ({ navigation }) => {
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <>
+          {/* Search Bar */}
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchBar}
@@ -226,6 +146,7 @@ const Productos = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
+          {/* Filters */}
           <View style={styles.filtersContainer}>
             <TouchableOpacity
               style={styles.filterButton}
@@ -249,6 +170,7 @@ const Productos = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
+          {/* Category Modal */}
           <Modal visible={isModalVisible} transparent animationType="slide">
             <View style={styles.modalContainer}>
               <View style={styles.modalContent}>
@@ -278,6 +200,7 @@ const Productos = ({ navigation }) => {
             </View>
           </Modal>
 
+          {/* Product List */}
           <ScrollView contentContainerStyle={styles.productsContainer}>
             {filteredProducts.length > 0 ? (
               filteredProducts.map((product, index) => (
@@ -324,9 +247,25 @@ const styles = StyleSheet.create({
   searchButton: {
     marginLeft: 10,
   },
+  filtersContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  filterButton: {
+    paddingVertical: 5,
+    paddingHorizontal: 15,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 20,
+  },
+  filterText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fondo semitransparente
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -334,8 +273,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 10,
     padding: 20,
-    width: '80%', // Ancho del modal
-    maxHeight: '80%', // Altura máxima del modal
+    width: '80%',
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 18,
@@ -363,22 +302,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
-  },
-  filtersContainer: {
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  filterButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 20,
-  },
-  filterText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   productsContainer: {
     flexDirection: 'row',

@@ -36,9 +36,9 @@ const Informes = ({ navigation }) => {
     const fetchData = async () => {
       try {
         const [productsResponse, opinionsResponse, storeResponse] = await Promise.all([
-          axios.get(`http://192.168.0.104:3000/Productos`),
-          axios.get(`http://192.168.0.104:3000/Opiniones`),
-          axios.get(`http://192.168.0.104:3000/tienda/${userId}`),
+          axios.get(`http://192.168.0.106:3000/Productos`),
+          axios.get(`http://192.168.0.106:3000/Opiniones`),
+          axios.get(`http://192.168.0.106:3000/tienda/${userId}`),
         ]);
 
         const storeData = storeResponse.data;

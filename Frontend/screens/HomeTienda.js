@@ -21,7 +21,7 @@ const HomeTienda = () => {
             }
 
             try {
-                const response = await axios.get(`http://192.168.0.104:3000/tienda/${userId}`);
+                const response = await axios.get(`http://192.168.0.106:3000/tienda/${userId}`);
                 setStoreName(response.data.nombre || 'Tu tienda');
                 setPlanId(response.data.plan_id); // Obtener también el plan_id
             } catch (error) {

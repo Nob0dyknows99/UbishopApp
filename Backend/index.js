@@ -4,21 +4,24 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 
 
-// Definir esquemas y modelos con las colecciones ya existentes
+// Definir esquemas y modelos
 const productoSchema = new mongoose.Schema({
+  producto_id: { type: Number, required: true, unique: true },
   nombre_producto: { type: String, required: true },
-  precio: { type: Number, required: true },
   descripcion: { type: String, required: true },
-  categoria_id: { type: mongoose.Schema.Types.Mixed, required: true },
+  precio: { type: Number, required: true },
+  categoria_id: { type: Number, required: true },
+  tienda_id: { type: Number, required: true },
+  estado: { type: String, required: true, default: 'activo' },
 });
 
 const opinionSchema = new mongoose.Schema({
   opinion_id: { type: Number, required: true },
   user_id: { type: Number, required: true },
-  producto_id: { type: mongoose.Schema.Types.Mixed, required: true },
+  producto_id: { type: Number, required: true },
   calificacion: { type: Number, required: true },
   comentario: { type: String, required: true },
-  fecha_opinion: { type: Date, required: true, default: Date.now },
+  fecha_opinion: { type: Date, default: Date.now },
 });
 
 const ubicacionSchema = new mongoose.Schema({
@@ -52,19 +55,20 @@ const tiendaSchema = new mongoose.Schema({
   plan_id: { type: Number, required: true },
 });
 
-const PlanesSchema = new mongoose.Schema({
-  periodo: {type: String, required:true},
-  costo: {type: Number, required: true},
+const planSchema = new mongoose.Schema({
   plan_id: { type: Number, required: true },
+  periodo: { type: String, required: true },
+  costo: { type: Number, required: true },
 });
 
-const Producto = mongoose.model('Producto', productoSchema, 'Productos'); // Conecta a la colección existente
-const Ubicacion = mongoose.model('Ubicacion', ubicacionSchema, 'ubicacion'); // Conecta a la colección "ubicacion"
-const Usuario = mongoose.model('Usuario', usuarioSchema, 'usuarios'); // Conecta a la colección "usuarios"
-const Tienda = mongoose.model('Tienda', tiendaSchema, 'Tiendas'); // Conecta a la colección "Tiendas"
+// Modelos
+const Producto = mongoose.model('Producto', productoSchema, 'Productos');
 const Opinion = mongoose.model('Opinion', opinionSchema, 'Opinion');
+const Ubicacion = mongoose.model('Ubicacion', ubicacionSchema, 'ubicacion');
 const Categoria = mongoose.model('Categoria', categoriaSchema, 'Categoria');
-const Planes = mongoose.model('Planes', PlanesSchema, 'Planes');
+const Usuario = mongoose.model('Usuario', usuarioSchema, 'usuarios');
+const Tienda = mongoose.model('Tienda', tiendaSchema, 'Tiendas');
+const Plan = mongoose.model('Plan', planSchema, 'Planes');
 
 // Inicialización de Express
 const app = express();
@@ -168,29 +172,37 @@ app.get('/tienda/:id', async (req, res) => {
 
 // Endpoint de login
 app.post('/login', async (req, res) => {
-  const { email, clave } = req.body;
-
   try {
+    console.log('Datos recibidos:', req.body); // Verifica los datos enviados
+    const { email, clave } = req.body;
+
+    if (!email || !clave) {
+      return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    }
+
     const usuario = await Usuario.findOne({ email: email.trim().toLowerCase() }).lean();
+    console.log('Usuario encontrado:', usuario); // Verifica el usuario obtenido
+
     if (!usuario || usuario.clave.trim() !== clave.trim()) {
       return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
 
     const rol = usuario.rol_id === 2 ? 'Tienda' : usuario.rol_id === 1 ? 'Cliente' : 'Desconocido';
-    
+
     res.json({
       mensaje: 'Inicio de sesión exitoso',
       rol,
       id: usuario.user_id,
       nombre_usuario: usuario.nombre_usuario,
       email: usuario.email,
-      telefono: usuario.telefono, // Asegúrate de incluir este campo
+      telefono: usuario.telefono,
     });
   } catch (error) {
-    console.error('Error al iniciar sesión:', error);
+    console.error('Error en login:', error);
     res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
+
 
 
 app.post('/register', async (req, res) => {
@@ -740,7 +752,61 @@ app.get('/ubicacion/:id', async (req, res) => {
 });
 
 
+app.post('/productos', async (req, res) => {
+  const { nombre_producto, precio, descripcion, categoria_id, tienda_id, estado } = req.body;
 
+  if (!nombre_producto || !precio || !descripcion || !categoria_id || !tienda_id) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios' });
+  }
+
+  try {
+    const maxProducto = await Producto.findOne().sort({ producto_id: -1 }).lean();
+    const nuevoProductoId = maxProducto ? maxProducto.producto_id + 1 : 1;
+
+    const nuevoProducto = new Producto({
+      producto_id: nuevoProductoId,
+      nombre_producto,
+      precio,
+      descripcion,
+      categoria_id,
+      tienda_id,
+      estado: estado || 'activo',
+    });
+
+    await nuevoProducto.save();
+    res.status(201).json({ mensaje: 'Producto creado exitosamente', producto: nuevoProducto });
+  } catch (error) {
+    console.error('Error al crear producto:', error);
+    res.status(500).json({ error: 'Error al crear el producto' });
+  }
+});
+
+
+app.put('/usuarios/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  const { nombre_usuario, telefono } = req.body;
+
+  if (!nombre_usuario || !telefono) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios' });
+  }
+
+  try {
+    const usuarioActualizado = await Usuario.findOneAndUpdate(
+      { user_id: parseInt(user_id) },
+      { nombre_usuario, telefono },
+      { new: true }
+    );
+
+    if (!usuarioActualizado) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ mensaje: 'Usuario actualizado correctamente', usuario: usuarioActualizado });
+  } catch (error) {
+    console.error('Error al actualizar el usuario:', error);
+    res.status(500).json({ error: 'Error al actualizar el usuario' });
+  }
+});
 
 
 
