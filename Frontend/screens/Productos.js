@@ -14,7 +14,20 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { FontAwesome } from 'react-native-vector-icons';
+import * as Location from 'expo-location';
 import { useAuth } from '../components/AuthContext';
+
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371; // Radio de la Tierra en kilómetros
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distancia en kilómetros
+};
 
 const ProductCard = ({ product, navigation }) => {
   const [imageUrl, setImageUrl] = useState('');
@@ -69,62 +82,112 @@ const Productos = ({ navigation, route }) => {
   const { role, userId } = useAuth();
   const initialSearchText = route?.params?.searchText || '';
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [tiendas, setTiendas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState(initialSearchText);
   const [categoryFilter, setCategoryFilter] = useState('Todos');
-  const [priceOrder, setPriceOrder] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [priceOrder, setPriceOrder] = useState(null);
+  const fixedRadius = 5000;
 
-  // Fetch products and categories from the backend
-  const fetchProductsAndCategories = async () => {
+  const fetchProducts = async () => {
     setLoading(true);
     try {
-      const [productResponse, categoryResponse] = await Promise.all([
-        axios.get('http://192.168.0.106:3000/productos'),
-        axios.get('http://192.168.0.106:3000/categorias'),
-      ]);
-
-      setProducts(productResponse.data);
-      setCategories([{ nombre_categoria: 'Todos', categoria_id: null }, ...categoryResponse.data]);
+      const response = await axios.get('http://192.168.0.106:3000/productos');
+      setProducts(response.data);
     } catch (error) {
-      console.error('Error al cargar productos o categorías:', error);
-      Alert.alert('Error', 'Hubo un problema al cargar los datos.');
+      console.error('Error al cargar productos:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchProductsAndCategories();
-  }, []);
+  const fetchLocations = async () => {
+    try {
+      const response = await axios.get('http://192.168.0.106:3000/ubicacion');
+      setLocations(response.data);
+    } catch (error) {
+      console.error('Error al cargar ubicaciones:', error);
+    }
+  };
 
-  // Filter products
-  const filteredProducts = products
-    .filter((product) => {
-      if (role === 'Tienda') {
-        return product.tienda_id === userId;
-      }
+  const fetchTiendas = async () => {
+    try {
+      const response = await axios.get('http://192.168.0.106:3000/tiendas');
+      setTiendas(response.data.filter((tienda) => tienda.plan_id !== 0));
+    } catch (error) {
+      console.error('Error al cargar tiendas:', error);
+    }
+  };
 
-      if (categoryFilter !== 'Todos') {
-        return (
-          product.categoria_id ===
-          categories.find((cat) => cat.nombre_categoria === categoryFilter)?.categoria_id
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('http://192.168.0.106:3000/categorias');
+      setCategories([{ nombre_categoria: 'Todos', categoria_id: null }, ...response.data]);
+    } catch (error) {
+      console.error('Error al cargar categorías:', error);
+    }
+  };
+
+  const fetchLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permisos necesarios',
+          'Se necesitan permisos de ubicación para filtrar productos cercanos.'
         );
+        return;
       }
 
-      return true;
-    })
-    .filter((product) =>
-      searchText
-        ? product.nombre_producto.toLowerCase().includes(searchText.toLowerCase())
-        : true
-    )
-    .sort((a, b) => {
-      if (priceOrder === 'asc') return a.precio - b.precio;
-      if (priceOrder === 'desc') return b.precio - a.precio;
-      return 0;
-    });
+      const location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error('Error al obtener la ubicación:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    fetchLocations();
+    fetchTiendas();
+    fetchCategories();
+    if (role !== 'Tienda') fetchLocation();
+  }, [role]);
+
+  const filteredProducts = products.filter((product) => {
+    const tienda = tiendas.find((t) => t.tienda_id === product.tienda_id);
+
+    if (!tienda) return false;
+
+    if (role === 'Tienda') {
+      return tienda.user_id === userId;
+    }
+
+    if (role === 'Todos' && userLocation) {
+      const location = locations.find((loc) => loc.tienda_id === product.tienda_id);
+      if (!location || !location.latitud || !location.longitud) {
+        return false;
+      }
+
+      const distance = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        location.latitud,
+        location.longitud
+      );
+
+      return distance <= fixedRadius;
+    }
+
+    return true;
+  });
 
   return (
     <View style={styles.container}>
@@ -132,7 +195,6 @@ const Productos = ({ navigation, route }) => {
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <>
-          {/* Search Bar */}
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchBar}
@@ -146,61 +208,6 @@ const Productos = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Filters */}
-          <View style={styles.filtersContainer}>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() => setModalVisible(true)}
-            >
-              <Text style={styles.filterText}>Categoría: {categoryFilter}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() =>
-                setPriceOrder(priceOrder === 'asc' ? 'desc' : priceOrder === 'desc' ? null : 'asc')
-              }
-            >
-              <Text style={styles.filterText}>
-                {priceOrder === 'asc'
-                  ? 'Menor a mayor'
-                  : priceOrder === 'desc'
-                  ? 'Mayor a menor'
-                  : 'Ordenar por precio'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Category Modal */}
-          <Modal visible={isModalVisible} transparent animationType="slide">
-            <View style={styles.modalContainer}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Selecciona una categoría</Text>
-                <FlatList
-                  data={categories}
-                  keyExtractor={(item, index) => `${item.nombre_categoria}-${index}`}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.modalItem}
-                      onPress={() => {
-                        setCategoryFilter(item.nombre_categoria);
-                        setModalVisible(false);
-                      }}
-                    >
-                      <Text style={styles.modalItemText}>{item.nombre_categoria}</Text>
-                    </TouchableOpacity>
-                  )}
-                />
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={styles.closeButtonText}>Cerrar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Product List */}
           <ScrollView contentContainerStyle={styles.productsContainer}>
             {filteredProducts.length > 0 ? (
               filteredProducts.map((product, index) => (
@@ -246,62 +253,6 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     marginLeft: 10,
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  filterButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 20,
-  },
-  filterText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    padding: 20,
-    width: '80%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  modalItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  modalItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  closeButton: {
-    backgroundColor: '#FF6347',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 15,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   productsContainer: {
     flexDirection: 'row',
