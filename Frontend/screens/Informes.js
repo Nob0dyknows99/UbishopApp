@@ -24,47 +24,55 @@ const Informes = ({ navigation }) => {
   const [outOfStockPercentage, setOutOfStockPercentage] = useState('');
   const [bestAndWorstProducts, setBestAndWorstProducts] = useState({});
 
-  const ratingMap = {
-    Excelente: 5,
-    Bueno: 4,
-    Regular: 3,
-    Malo: 2,
-    Terrible: 1,
-  };
-
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [productsResponse, opinionsResponse, storeResponse] = await Promise.all([
-          axios.get(`http://192.168.0.106:3000/Productos`),
-          axios.get(`http://192.168.0.106:3000/Opiniones`),
-          axios.get(`http://192.168.0.106:3000/tienda/${userId}`),
-        ]);
-
-        const storeData = storeResponse.data;
-        const storeProducts = productsResponse.data.filter(
-          (product) => product.tienda_id === storeData.tienda_id
-        );
-
-        setProducts(storeProducts);
-        setOpinions(opinionsResponse.data);
-        setStoreName(storeData.nombre || 'Tienda');
-
-        generateReports(storeProducts, opinionsResponse.data);
-      } catch (error) {
-        console.error('Error al cargar datos:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, [userId]);
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      const [productsResponse, opinionsResponse, storeResponse] = await Promise.all([
+        axios.get(`http://192.168.0.106:3000/productos`),
+        axios.get(`http://192.168.0.106:3000/opiniones`),
+        axios.get(`http://192.168.0.106:3000/tienda/${userId}`),
+      ]);
+
+      const storeData = storeResponse.data;
+      const storeProducts = productsResponse.data.filter(
+        (product) => product.tienda_id === storeData.tienda_id
+      );
+
+      setProducts(storeProducts);
+      setOpinions(opinionsResponse.data);
+      setStoreName(storeData.nombre || 'Tienda');
+
+      generateReports(storeProducts, opinionsResponse.data);
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+      alert('Hubo un problema al cargar los informes.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const generateReports = (products, opinions) => {
+    if (products.length === 0) {
+      setActiveProducts(0);
+      setAverageRatings([]);
+      setOutOfStockPercentage('0%');
+      setBestAndWorstProducts({
+        mejorProducto: 'Sin datos',
+        peorProducto: 'Sin datos',
+      });
+      return;
+    }
+
+    // Calcular productos activos
     const activeCount = products.filter((product) => product.estado === 'activo').length;
     setActiveProducts(activeCount);
 
+    // Calcular calificaciones promedio por producto
     const ratings = products.map((product) => {
       const productOpinions = opinions.filter(
         (opinion) => opinion.producto_id === product.producto_id
@@ -74,42 +82,57 @@ const Informes = ({ navigation }) => {
         return { producto: product.nombre_producto, promedio: 'Sin calificaciones' };
       }
 
+      // Obtener la suma total de calificaciones
       const totalRating = productOpinions.reduce((sum, opinion) => {
-        const ratingValue = ratingMap[opinion.calificacion?.trim()] || 0;
+        const ratingValue = parseFloat(opinion.calificacion) || 0; // Asegurar que sea un número
         return sum + ratingValue;
       }, 0);
 
       const averageRating = totalRating / productOpinions.length;
-
       return { producto: product.nombre_producto, promedio: averageRating.toFixed(2) };
     });
 
     setAverageRatings(ratings);
     setSelectedProduct(ratings[0]?.producto || null);
 
+    // Calcular porcentaje de productos inactivos
     const outOfStockCount = products.filter((product) => product.estado !== 'activo').length;
     const percentage = ((outOfStockCount / products.length) * 100).toFixed(2);
     setOutOfStockPercentage(`${percentage}%`);
 
-    const ratedProducts = ratings.filter((r) => r.promedio !== 'Sin calificaciones').map((r) => ({
-      ...r,
-      promedio: parseFloat(r.promedio),
-    }));
+    // Identificar mejor y peor producto basado en el promedio
+    const ratedProducts = ratings.filter((r) => r.promedio !== 'Sin calificaciones');
+    if (ratedProducts.length > 0) {
+      const bestProduct = ratedProducts.reduce((best, current) =>
+        parseFloat(current.promedio) > parseFloat(best.promedio) ? current : best
+      );
 
-    const bestProduct = ratedProducts.reduce((best, current) =>
-      current.promedio > best.promedio ? current : best,
-      { producto: 'Sin datos', promedio: 0 }
-    );
+      const worstProduct = ratedProducts.reduce((worst, current) =>
+        parseFloat(current.promedio) < parseFloat(worst.promedio) ? current : worst
+      );
 
-    const worstProduct = ratedProducts.reduce((worst, current) =>
-      current.promedio < worst.promedio ? current : worst,
-      { producto: 'Sin datos', promedio: 0 }
-    );
+      setBestAndWorstProducts({
+        mejorProducto: bestProduct.producto,
+        peorProducto: worstProduct.producto,
+      });
+    } else {
+      setBestAndWorstProducts({
+        mejorProducto: 'Sin datos',
+        peorProducto: 'Sin datos',
+      });
+    }
+  };
 
-    setBestAndWorstProducts({
-      mejorProducto: bestProduct.producto,
-      peorProducto: worstProduct.producto,
-    });
+  const reloadOpinions = async () => {
+    try {
+      const opinionsResponse = await axios.get(`http://192.168.0.106:3000/opiniones`);
+      setOpinions(opinionsResponse.data);
+
+      // Actualizar los informes con las opiniones recargadas
+      generateReports(products, opinionsResponse.data);
+    } catch (error) {
+      console.error('Error al recargar las opiniones:', error);
+    }
   };
 
   if (loading) {
@@ -172,9 +195,15 @@ const Informes = ({ navigation }) => {
           <Text style={styles.cardValue}>{bestAndWorstProducts.peorProducto}</Text>
         </View>
       </View>
+
+      {/* Botón para recargar opiniones */}
+      <TouchableOpacity style={styles.reloadButton} onPress={reloadOpinions}>
+        <Text style={styles.reloadButtonText}>Actualizar Opiniones</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

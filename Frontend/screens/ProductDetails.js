@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  TextInput,
+  Linking,
+} from 'react-native';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import axios from 'axios';
 import { useAuth } from '../components/AuthContext';
 
@@ -9,66 +19,35 @@ const ProductDetails = ({ route, navigation }) => {
   const { product } = route.params;
   const [reviews, setReviews] = useState([]);
   const [newReview, setNewReview] = useState('');
-  const [newRating, setNewRating] = useState('');
+  const [newRating, setNewRating] = useState('Excelente');
   const [isModalVisible, setModalVisible] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const [productImageUrl, setProductImageUrl] = useState(null);
-  const [storeName, setStoreName] = useState('Tienda no disponible');
+  const [storeName, setStoreName] = useState('Cargando...');
   const [storeLocation, setStoreLocation] = useState(null);
   const { isLoggedIn, userId, userInfo } = useAuth();
 
+  const ratingMap = {
+    Excelente: 5,
+    Bueno: 4,
+    Regular: 3,
+    Malo: 2,
+    Terrible: 1,
+  };
+
   useEffect(() => {
-    const fetchUserLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permisos necesarios', 'Se requieren permisos de ubicación.');
-          return;
-        }
-        const location = await Location.getCurrentPositionAsync({});
-        setUserLocation(location.coords);
-      } catch (error) {
-        console.error('Error al obtener ubicación del usuario:', error);
-      }
-    };
-
-    const fetchReviews = async () => {
-      if (!product.producto_id) {
-        console.error('Error: producto_id está indefinido.');
-        return;
-      }
-      try {
-        const response = await axios.get(`http://192.168.0.106:3000/opiniones/producto/${product.producto_id}`);
-        setReviews(response.data);
-      } catch (error) {
-        console.error('Error al obtener opiniones:', error);
-      }
-    };
-
-    const fetchProductImage = async () => {
-      try {
-        const response = await axios.get('https://api.unsplash.com/search/photos', {
-          params: { query: product.nombre_producto || 'default', per_page: 1 },
-          headers: { Authorization: `Client-ID ML8EDJv2Br2bJJMyTcksZRbEPQRcr4aKmnkt7LkB9Ww` },
-        });
-        if (response.data.results.length > 0) {
-          setProductImageUrl(response.data.results[0].urls.regular);
-        }
-      } catch (error) {
-        console.error('Error al obtener la imagen de Unsplash:', error);
-      }
-    };
-
     const fetchStoreDetails = async () => {
       if (product?.tienda_id) {
         try {
-          const locationResponse = await axios.get(`http://192.168.0.106:3000/ubicacion/${product.tienda_id}`);
+          const locationResponse = await axios.get(
+            `http://192.168.0.106:3000/ubicacion/${product.tienda_id}`
+          );
           setStoreLocation(locationResponse.data);
         } catch (error) {
           console.error('Error al obtener la ubicación de la tienda:', error);
         }
         try {
-          const storeResponse = await axios.get(`http://192.168.0.106:3000/tienda/${product.tienda_id}`);
+          const storeResponse = await axios.get(
+            `http://192.168.0.106:3000/tienda/${product.tienda_id}`
+          );
           setStoreName(storeResponse.data.nombre || 'Tienda no disponible');
         } catch (error) {
           console.error('Error al obtener el nombre de la tienda:', error);
@@ -76,10 +55,19 @@ const ProductDetails = ({ route, navigation }) => {
       }
     };
 
-    fetchUserLocation();
-    fetchReviews();
-    fetchProductImage();
+    const fetchReviews = async () => {
+      try {
+        const response = await axios.get(
+          `http://192.168.0.106:3000/opiniones/producto/${product.producto_id}`
+        );
+        setReviews(response.data);
+      } catch (error) {
+        console.error('Error al obtener opiniones:', error);
+      }
+    };
+
     fetchStoreDetails();
+    fetchReviews();
   }, [product]);
 
   const handleNavigateToStore = () => {
@@ -101,9 +89,8 @@ const ProductDetails = ({ route, navigation }) => {
       return;
     }
 
-    const rating = Math.min(5, Math.max(1, parseInt(newRating)));
-    if (!newReview.trim() || rating <= 0) {
-      Alert.alert('Error', 'Debe ingresar una reseña válida y una calificación entre 1 y 5.');
+    if (!newReview.trim()) {
+      Alert.alert('Error', 'Debe ingresar una reseña válida.');
       return;
     }
 
@@ -112,19 +99,40 @@ const ProductDetails = ({ route, navigation }) => {
         opinion_id: Date.now(),
         user_id: userId,
         producto_id: product.producto_id,
-        calificacion: rating,
+        calificacion: ratingMap[newRating],
         comentario: newReview.trim(),
       };
 
-      await axios.post('http://192.168.0.106:3000/opiniones', newOpinion);
-      setReviews([...reviews, { ...newOpinion, usuario: userInfo.nombre_usuario }]);
-      setNewReview('');
-      setNewRating('');
-      setModalVisible(false);
-      Alert.alert('Éxito', 'Reseña añadida exitosamente.');
+      const response = await axios.post('http://192.168.0.106:3000/opiniones', newOpinion);
+
+      if (response.status === 201) {
+        setReviews([...reviews, { ...newOpinion, usuario: userInfo.nombre_usuario }]);
+        setNewReview('');
+        setNewRating('Excelente');
+        setModalVisible(false);
+        Alert.alert('Éxito', 'Reseña añadida exitosamente.');
+      } else {
+        throw new Error('Error inesperado al guardar la reseña.');
+      }
     } catch (error) {
       console.error('Error al agregar reseña:', error);
+      Alert.alert('Error', 'No se pudo agregar la reseña. Verifica los datos ingresados.');
     }
+  };
+
+  const renderStars = (rating) => {
+    return (
+      <View style={styles.starsContainer}>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <FontAwesome
+            key={index}
+            name={index < rating ? 'star' : 'star-o'}
+            size={16}
+            color="gold"
+          />
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -135,42 +143,33 @@ const ProductDetails = ({ route, navigation }) => {
       </TouchableOpacity>
 
       <View style={styles.card}>
-        <Text style={styles.storeName}>{storeName}</Text>
-        <Image
-          source={{ uri: productImageUrl || 'https://via.placeholder.com/150' }}
-          style={styles.productImage}
-        />
         <Text style={styles.productName}>{product.nombre_producto}</Text>
+        <Image source={{ uri: product.imagen }} style={styles.productImage} />
+        <Text style={styles.storeName}>Tienda: {storeName}</Text>
         <Text style={styles.productPrice}>${product.precio}</Text>
         <Text style={styles.productDescription}>{product.descripcion}</Text>
         <TouchableOpacity style={styles.navigateButton} onPress={handleNavigateToStore}>
           <Text style={styles.navigateButtonText}>Ir a tienda</Text>
         </TouchableOpacity>
       </View>
-      {/* Reviews Section */}
+
       <View style={styles.reviewsHeader}>
         <Text style={styles.reviewsTitle}>Reseñas</Text>
-        <TouchableOpacity style={styles.addReviewButton} onPress={() => setModalVisible(true)}>
-          <FontAwesome name="plus" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
+        {isLoggedIn && (
+          <TouchableOpacity style={styles.addReviewButton} onPress={() => setModalVisible(true)}>
+            <FontAwesome name="plus" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
       </View>
-      {reviews.length > 0 ? (
-        reviews.map((review) => (
-          <View key={review.opinion_id} style={styles.reviewCard}>
-            <Text style={styles.reviewAuthor}>{review.usuario || 'Usuario desconocido'}:</Text>
-            <View style={styles.reviewRating}>
-              {Array.from({ length: review.calificacion }).map((_, i) => (
-                <FontAwesome key={i} name="star" size={16} color="gold" />
-              ))}
-            </View>
-            <Text style={styles.reviewText}>{review.comentario}</Text>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.noReviewsText}>No hay reseñas para este producto.</Text>
-      )}
 
-      {/* Modal for Adding Review */}
+      {reviews.map((review, index) => (
+        <View key={index} style={styles.reviewCard}>
+          <Text style={styles.reviewAuthor}>{review.usuario || 'Usuario desconocido'}</Text>
+          {renderStars(review.calificacion)}
+          <Text style={styles.reviewText}>{review.comentario}</Text>
+        </View>
+      ))}
+
       <Modal visible={isModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -181,13 +180,18 @@ const ProductDetails = ({ route, navigation }) => {
               value={newReview}
               onChangeText={setNewReview}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Calificación (1-5)"
-              keyboardType="numeric"
-              value={newRating}
-              onChangeText={(value) => setNewRating(value.replace(/[^0-9]/g, ''))}
-            />
+            <TouchableOpacity
+              style={styles.selectorButton}
+              onPress={() => Alert.alert('Selecciona una calificación', null, [
+                ...Object.keys(ratingMap).map((rating) => ({
+                  text: rating,
+                  onPress: () => setNewRating(rating),
+                })),
+                { text: 'Cancelar', style: 'cancel' },
+              ])}
+            >
+              <Text style={styles.selectorButtonText}>Calificación: {newRating}</Text>
+            </TouchableOpacity>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.saveButton} onPress={handleAddReview}>
                 <Text style={styles.saveButtonText}>Guardar</Text>
@@ -208,8 +212,9 @@ const ProductDetails = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
-    backgroundColor: '#FFFFFF',
+    flexGrow: 1,
+    padding: 20,
+    backgroundColor: '#FFF',
   },
   backButton: {
     flexDirection: 'row',
@@ -219,49 +224,47 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 16,
     color: '#007BFF',
-    marginLeft: 5,
   },
   card: {
-    alignItems: 'center',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 10,
-    padding: 10,
     marginBottom: 20,
+    alignItems: 'center',
+  },
+  productName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   storeName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#333',
     marginBottom: 10,
   },
   productImage: {
-    width: 150,
-    height: 150,
-    resizeMode: 'contain',
+    width: 200,
+    height: 200,
+    borderRadius: 10,
     marginBottom: 10,
   },
-  productName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
   productPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#00C853',
+    fontSize: 20,
+    color: '#333',
+    marginBottom: 10,
   },
   productDescription: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
   },
   navigateButton: {
-    backgroundColor: '#FF5722',
+    backgroundColor: '#007BFF',
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
   },
   navigateButtonText: {
-    color: '#FFFFFF',
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   reviewsHeader: {
@@ -275,54 +278,51 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   addReviewButton: {
-    backgroundColor: '#4169E1',
-    borderRadius: 10,
+    backgroundColor: '#007BFF',
     padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 5,
   },
   reviewCard: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 10,
-    padding: 10,
     marginBottom: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 5,
   },
   reviewAuthor: {
-    fontWeight: 'bold',
     fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
-  reviewRating: {
+  starsContainer: {
     flexDirection: 'row',
+    marginBottom: 5,
   },
   reviewText: {
     fontSize: 14,
-  },
-  noReviewsText: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
+    color: '#333',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: '#FFF',
     padding: 20,
     borderRadius: 10,
-    width: '80%',
+    width: '90%',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
+    marginBottom: 10,
   },
   input: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CCC',
+    borderRadius: 5,
     padding: 10,
     marginBottom: 10,
   },
@@ -331,22 +331,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   saveButton: {
-    backgroundColor: '#4169E1',
+    backgroundColor: '#007BFF',
     padding: 10,
     borderRadius: 5,
   },
   saveButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontSize: 16,
   },
   cancelButton: {
-    backgroundColor: '#FF6347',
+    backgroundColor: '#CCC',
     padding: 10,
     borderRadius: 5,
   },
   cancelButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+    color: '#333',
+    fontSize: 16,
   },
 });
 

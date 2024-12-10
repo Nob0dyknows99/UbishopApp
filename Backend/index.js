@@ -3,16 +3,39 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("cloudinary").v2;
+
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "productos", // Carpeta en Cloudinary donde se guardarán las imágenes
+    allowed_formats: ["jpg", "png", "jpeg"], // Formatos permitidos
+  },
+});
+
+const upload = multer({ storage: storage });
+
+
+cloudinary.config({
+  cloud_name: "dzzx68yns", // Reemplaza con tu Cloud Name
+  api_key: "562513542516234", // Reemplaza con tu API Key
+  api_secret: "6-zHUGq5NhTSQtWtjwIExxzcShY", // Reemplaza con tu API Secret
+});
+
 
 // Definir esquemas y modelos
 const productoSchema = new mongoose.Schema({
   producto_id: { type: Number, required: true, unique: true },
+  tienda_id: { type: Number, required: true },
   nombre_producto: { type: String, required: true },
   descripcion: { type: String, required: true },
   precio: { type: Number, required: true },
   categoria_id: { type: Number, required: true },
-  tienda_id: { type: Number, required: true },
-  estado: { type: String, required: true, default: 'activo' },
+  estado: { type: String, required: true, default: "activo" },
+  imagen: { type: String, required: true }, // Campo para la URL de la imagen
 });
 
 const opinionSchema = new mongoose.Schema({
@@ -62,7 +85,7 @@ const planSchema = new mongoose.Schema({
 });
 
 // Modelos
-const Producto = mongoose.model('Producto', productoSchema, 'Productos');
+const Productos = mongoose.model("Productos", productoSchema, "Productos");
 const Opinion = mongoose.model('Opinion', opinionSchema, 'Opinion');
 const Ubicacion = mongoose.model('Ubicacion', ubicacionSchema, 'ubicacion');
 const Categoria = mongoose.model('Categoria', categoriaSchema, 'Categoria');
@@ -89,7 +112,7 @@ mongoose
 // Leer productos
 app.get('/productos', async (req, res) => {
   try {
-    const productos = await Producto.find().lean();
+    const productos = await Productos.find().lean();
     res.json(productos);
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener los productos' });
@@ -108,12 +131,13 @@ app.get('/Planes', async (req, res) => {
 // Obtener todas las opiniones
 app.get('/opiniones', async (req, res) => {
   try {
-    const opiniones = await Opinion.find().lean();
+    const opiniones = await Opinion.find({ producto_id: { $exists: true } }).lean();
     res.json(opiniones);
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener las opiniones' });
   }
 });
+
 
 // Obtener Categorias
 app.get('/categorias', async (req, res) => {
@@ -260,36 +284,47 @@ app.post('/tiendas', async (req, res) => {
 });
 
 // Endpoint para editar un producto
-app.put('/productos/:producto_id', async (req, res) => {
-  const { producto_id } = req.params; // Obtenemos el producto_id
+app.put("/productos/:producto_id", upload.single("imagen"), async (req, res) => {
+  const { producto_id } = req.params;
   const { nombre_producto, precio, descripcion, categoria_id, estado } = req.body;
 
-  // Validación de campos
   if (!nombre_producto || !precio || !descripcion || !categoria_id) {
-      return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
   try {
-      // Buscar el producto por producto_id y actualizarlo
-      const productoActualizado = await Producto.findOneAndUpdate(
-          { producto_id: parseInt(producto_id) }, // Buscar por producto_id
-          { nombre_producto, precio, descripcion, categoria_id, estado }, // Actualizar campos
-          { new: true } // Devolver el producto actualizado
-      );
+    // Obtener el producto actual
+    const producto = await Productos.findOne({ producto_id: parseInt(producto_id) });
+    if (!producto) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
 
-      if (!productoActualizado) {
-          return res.status(404).json({ error: 'Producto no encontrado' });
-      }
+    // Actualizar los campos básicos
+    producto.nombre_producto = nombre_producto;
+    producto.precio = precio;
+    producto.descripcion = descripcion;
+    producto.categoria_id = categoria_id;
+    producto.estado = estado || producto.estado;
 
-      res.json({
-          mensaje: 'Producto actualizado exitosamente',
-          producto: productoActualizado,
-      });
+    // Verificar si se subió una nueva imagen
+    if (req.file && req.file.path) {
+      // Actualizar la URL de la imagen en Cloudinary
+      producto.imagen = req.file.path;
+    }
+
+    // Guardar los cambios
+    const productoActualizado = await producto.save();
+
+    res.json({
+      mensaje: "Producto actualizado exitosamente",
+      producto: productoActualizado,
+    });
   } catch (error) {
-      console.error('Error al actualizar el producto:', error);
-      res.status(500).json({ error: 'Error al actualizar el producto' });
+    console.error("Error al actualizar el producto:", error);
+    res.status(500).json({ error: "Error al actualizar el producto" });
   }
 });
+
 
 
 //eliminar producto
@@ -311,53 +346,53 @@ app.delete('/productos/:producto_id', async (req, res) => {
 
 
 // Endpoint para insertar en "Productos"
-app.get('/productos', async (req, res) => {
-  try {
-    const productos = await Producto.aggregate([
-      {
-        $lookup: {
-          from: 'Tiendas', // Nombre exacto de la colección de tiendas
-          localField: 'tienda_id', // Campo en la colección Productos
-          foreignField: 'tienda_id', // Campo en la colección Tiendas
-          as: 'tiendaInfo', // Resultado del join
-        },
-      },
-      {
-        $unwind: {
-          path: '$tiendaInfo', // Desanidar la información de la tienda
-          preserveNullAndEmptyArrays: true, // Permitir productos sin tienda asociada
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          producto_id: 1,
-          tienda_id: 1,
-          nombre_producto: 1,
-          descripcion: 1,
-          precio: 1,
-          categoria_id: 1,
-          estado: 1,
-          'tiendaInfo.nombre': 1, // Incluye el nombre de la tienda
-          'tiendaInfo.descripcion': 1, // Incluye la descripción de la tienda
-        },
-      },
-    ]);
 
-    res.json(productos);
+
+app.post("/productos", upload.single("imagen"), async (req, res) => {
+  try {
+    const {
+      tienda_id,
+      nombre_producto,
+      descripcion,
+      precio,
+      categoria_id,
+      estado,
+    } = req.body;
+
+    // Encuentra el último producto_id en la colección
+    const ultimoProducto = await Productos.findOne().sort({ producto_id: -1 });
+
+    // Define el nuevo producto_id
+    const nuevoProductoId = ultimoProducto ? ultimoProducto.producto_id + 1 : 1;
+
+    // Obtén la URL de la imagen subida a Cloudinary
+    const imagenUrl = req.file.path;
+
+    // Crea el nuevo producto
+    const nuevoProducto = new Productos({
+      producto_id: nuevoProductoId,
+      tienda_id,
+      nombre_producto,
+      descripcion,
+      precio,
+      categoria_id,
+      estado: estado || "activo", // Usa "activo" por defecto si no se proporciona
+      imagen: imagenUrl, // Agrega la URL de la imagen
+    });
+
+    // Guarda el producto en la base de datos
+    await nuevoProducto.save();
+
+    // Envía la respuesta
+    res.status(201).json({
+      message: "Producto agregado exitosamente",
+      producto: nuevoProducto,
+    });
   } catch (error) {
-    console.error('Error al obtener productos:', error);
-    res.status(500).json({ error: 'Error al obtener productos' });
+    console.error("Error al agregar producto:", error);
+    res.status(500).json({ message: "Error al agregar producto", error });
   }
 });
-
-
-
-
-
-
-
-
 
 
 // Endpoint para insertar en "Ubicacion"
@@ -595,26 +630,42 @@ app.get('/tienda/plan/:user_id', async (req, res) => {
 app.post('/opiniones', async (req, res) => {
   const { opinion_id, user_id, producto_id, calificacion, comentario } = req.body;
 
+  // Validar datos obligatorios
   if (!opinion_id || !user_id || !producto_id || !calificacion || !comentario) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
 
+  // Validar rango de calificación
+  if (calificacion < 1 || calificacion > 5) {
+    return res.status(400).json({ error: 'La calificación debe estar entre 1 y 5' });
+  }
+
   try {
+    // Verificar si el producto existe
+    const producto = await Productos.findOne({ producto_id: parseInt(producto_id) });
+    if (!producto) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    // Crear nueva opinión
     const nuevaOpinion = new Opinion({
       opinion_id,
       user_id,
       producto_id,
       calificacion,
       comentario,
-      fecha_opinion: new Date(), // Fecha actual
+      fecha_opinion: new Date(),
     });
 
+    // Guardar en la base de datos
     await nuevaOpinion.save();
     res.status(201).json({ mensaje: 'Opinión registrada exitosamente' });
   } catch (error) {
+    console.error('Error al registrar la opinión:', error);
     res.status(500).json({ error: 'Error al registrar la opinión' });
   }
 });
+
 
 
 // Editar una opinión
@@ -760,10 +811,10 @@ app.post('/productos', async (req, res) => {
   }
 
   try {
-    const maxProducto = await Producto.findOne().sort({ producto_id: -1 }).lean();
+    const maxProducto = await Productos.findOne().sort({ producto_id: -1 }).lean();
     const nuevoProductoId = maxProducto ? maxProducto.producto_id + 1 : 1;
 
-    const nuevoProducto = new Producto({
+    const nuevoProducto = new Productos({
       producto_id: nuevoProductoId,
       nombre_producto,
       precio,
